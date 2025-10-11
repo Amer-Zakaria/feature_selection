@@ -3,9 +3,6 @@ scikit-learn
 numpy 
 matplotlib
 seaborn
-dataclasses
-typing
-collections
-time
+gradio
 
 # For installation, run: pip install -r requirements.txt
