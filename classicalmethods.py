@@ -1,4 +1,4 @@
-
+"""   NOTE: ensure that the target feature is the first column after the indexing column """
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
@@ -7,14 +7,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import RFE
-from sklearn.linear_model import LinearRegression
+
+from sklearn.linear_model import LinearRegression, Lasso
 from sklearn.metrics import mean_squared_error
+from sklearn.pipeline import make_pipeline
 from typing import List
 from collections import Counter
 import time
 
 @dataclass
-class SplitData:            # a class to hold the data and its training features
+class SplitData:            ## a class to hold the data and its training features
     X_train: pd.DataFrame
     X_test: pd.DataFrame
     y_train: pd.Series
@@ -26,7 +28,7 @@ def data_preprocessing(
     csv_url: str = "data.csv", #default file name & path
     test_size: float = 0.25,    #proportion of data to test (rest is training)
     use_scaling: bool = True,    #a statistical scaling of data to enable faster alg performance
-    scaling_method: str = "robust",  #  "standard" "robust" or "minmax"   
+    scaling_method: str = "robust",  #  "standard" or "robust" or "minmax"   
     use_pca: bool = False,       #PCA=Principal Component Analysis (reduces number of vars to make analysis faster)
     pca_variance: float = 0.95   #bigger variance leads to less reduction of variables
 ) -> SplitData:
@@ -46,8 +48,8 @@ def data_preprocessing(
     df_numeric = df_numeric[numeric_columns]
 
     ### split into target and features
-    target = df_numeric.iloc[:, 0] # TARGET IS ALWAYS THE 1ST COLUMN #
-    data = df_numeric.iloc[:, 1:]
+    target = df_numeric.iloc[:, 1] # TARGET IS ALWAYS THE 1ST COLUMN #
+    data = df_numeric.iloc[:, 2:]
 
     ###remove rows with missing target values
     mask = ~np.isnan(target)
@@ -59,7 +61,7 @@ def data_preprocessing(
 
     ##sort values based on variance (for easier analysis)
     variances = data.var().sort_values(ascending=False)
-    selected_features = variances.head(len(data.columns)).index
+    selected_features = variances.index.tolist()
     data = data[selected_features]
 
     ###split data with conditional stratification
@@ -81,21 +83,22 @@ def data_preprocessing(
     else:
         n_neighbors = min(5, max(2, len(X_train) // 20))  #to ensure at least 2 neighbors
         imputer = KNNImputer(n_neighbors=n_neighbors)
-        print("Using knn imputation with ", n_neighbors, " neighbors")
+        print("Using knn imputation with ",n_neighbors, " neighbors")
 
     ###impute missing values
     X_train_imputed = imputer.fit_transform(X_train)
     X_test_imputed = imputer.transform(X_test)
 
     ###apply PCA for dimensionality reduction if it's requested
+    
     if use_pca and X_train_imputed.shape[1] > 2:
-        ###ensure we have enough samples for pca
         n_components = min(X_train_imputed.shape[0] - 1, X_train_imputed.shape[1])
         if n_components > 1:
             pca = PCA(n_components=min(pca_variance, n_components))
             X_train_imputed = pca.fit_transform(X_train_imputed)
             X_test_imputed = pca.transform(X_test_imputed)
-            print("PCA reduced features to ", X_train_imputed.shape[1]," components explaining ", pca.explained_variance_ratio_.sum(), " of variance ")
+            print("PCA reduced features to ", X_train_imputed.shape[1],
+                  " components explaining ", pca.explained_variance_ratio_.sum(), " of variance ")
             feature_names = [f"PC {i+1}" for i in range(X_train_imputed.shape[1])]
         else:
             feature_names = data.columns.tolist()
@@ -125,9 +128,6 @@ def data_preprocessing(
     print("Final dataset: ",X_train_df.shape[0]," training, ",X_test_df.shape[0]," test samples")
     print("features: ",{X_train_df.shape[1]})
     
-    if can_stratify:
-        print("Class distribution in training: ",dict(Counter(y_train)))
-        print("Class distribution in test: ",{dict(Counter(y_test))})
 
     return SplitData(
         X_train=X_train_df,
@@ -137,6 +137,10 @@ def data_preprocessing(
         feature_names=feature_names,
         scaler=scaler
     )
+
+
+
+###Recursive  Feature Elimination(RFE) method
 
 @dataclass
 class RFEResults:
@@ -148,8 +152,8 @@ class RFEResults:
 
 def perform_rfe(
     split_data,
-    n_features_to_select: int = 10, ###  default num features to keep in the end  ###
-    step: int = 5                   ##   default num features to remove at a time for speed  ###
+    n_features_to_select: int = 1, ###  default num features to keep in the end  ###
+    step: int = 1                   ###  default num features to remove at a time for speed  ###
 ) -> RFEResults:
     
     X_train, X_test, y_train, y_test = (
@@ -182,19 +186,18 @@ def perform_rfe(
     estimator.fit(X_train_selected, y_train)
     y_pred_train = estimator.predict(X_train_selected)
     y_pred_test = estimator.predict(X_test_selected)
-    
+
     train_rmse = mean_squared_error(y_train, y_pred_train)
     test_rmse = mean_squared_error(y_test, y_pred_test)
-    
-    ###RESUTLS PRINTING 
+ 
     print(f"Original features: {X_train.shape[1]} ")
     print(f"Selected features: {n_features_to_select}")
     print(f"Step size: {step} ")
     print(f"Train RMSE: {train_rmse:.4f}")
     print(f"Test RMSE: {test_rmse:.4f}")
-    print("\nSELECTED FEATURES (in ranking order):")
+    print("\nSELECTED FEATURES:")
     for i, feature in enumerate(selected_features, 1):
-        print(f"  {i:2d}. {feature}")
+        print(feature)
     
     print(f"\nTOP 10 FEATURE RANKINGS:")
     top_rankings = feature_ranking.head(10)
@@ -220,16 +223,17 @@ def get_top_features(rfe_results: RFEResults, top_n: int = 0) -> pd.DataFrame:
 
 if __name__ == "__main__":
     split_data = data_preprocessing("data.csv") ##change if needed##
-    
-    start = time.perf_counter()
+
+    Rstart = time.perf_counter()
     rfe_results = perform_rfe(
         split_data=split_data,
-        n_features_to_select=30, ## chosse num of features to keep ##
-        step=1  ## chosse num features to remove at a time for speed (bigger ==> faster)##
+        n_features_to_select=10,
+        step=1  ## chosse num features to remove at a time for speed (bigger ==> faster) but keep it less than n_features ##
     )
-    end = time.perf_counter()
+    Rend = time.perf_counter()
     
     X_train_best = split_data.X_train[rfe_results.selected_features]
     X_test_best = split_data.X_test[rfe_results.selected_features]
     
-    print("RFE method time taken: ", end-start, " seconds\n")
+    print("\nRFE method time taken: ",Rend-Rstart," seconds\n\n")
+
