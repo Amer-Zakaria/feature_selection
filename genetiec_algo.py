@@ -11,8 +11,7 @@ class FeatureSelectionGeneticAlgorithm:
     Implements a genetic algorithm for feature selection.
 
     The algorithm evolves a population of feature subsets (individuals)
-    to find an optimal subset that maximizes a fitness score, which is
-    based on model performance (MSE) and the number of selected features.
+    to find an optimal subset that maximizes a fitness score
     """
 
     def __init__(
@@ -97,6 +96,38 @@ class FeatureSelectionGeneticAlgorithm:
         # Lower MSE = Higher fitness
         return 1.0 / (1.0 + mse)
 
+    def _select_parents(
+        self, population: List[List[int]], fitness_scores: List[float]
+    ) -> Tuple[List[int], List[int]]:
+        """
+        Selects two parents from the population using tournament selection.
+
+        A small group of individuals (tournament_size) is 3,
+        and the individual with the highest fitness from this group is selected.
+        This process is repeated twice to get two parents.
+
+        Args:
+            population (List[List[int]]): The current population of individuals.
+            fitness_scores (List[float]): The fitness scores corresponding to the population.
+
+        Returns:
+            Tuple[List[int], List[int]]: A tuple containing the two selected parent individuals.
+        """
+
+        def tournament_select():
+            tournament_size = 3
+            tournament_indices = random.sample(range(len(population)), tournament_size)
+            tournament_fitness = [fitness_scores[i] for i in tournament_indices]
+
+            winner_idx = tournament_indices[
+                tournament_fitness.index(max(tournament_fitness))
+            ]
+            return population[winner_idx]
+
+        parent1 = tournament_select()
+        parent2 = tournament_select()
+        return parent1, parent2
+
     def _crossover(self, parent1: List[int], parent2: List[int]) -> List[int]:
         """
         Performs single-point crossover between two parents to create an offspring.
@@ -133,38 +164,6 @@ class FeatureSelectionGeneticAlgorithm:
             if random.random() < self.mutation_rate:
                 mutated[i] = 1 - mutated[i]  # Flip the bit (0 to 1, or 1 to 0)
         return mutated
-
-    def _select_parents(
-        self, population: List[List[int]], fitness_scores: List[float]
-    ) -> Tuple[List[int], List[int]]:
-        """
-        Selects two parents from the population using tournament selection.
-
-        A small group of individuals (tournament_size) is randomly chosen,
-        and the individual with the highest fitness from this group is selected.
-        This process is repeated twice to get two parents.
-
-        Args:
-            population (List[List[int]]): The current population of individuals.
-            fitness_scores (List[float]): The fitness scores corresponding to the population.
-
-        Returns:
-            Tuple[List[int], List[int]]: A tuple containing the two selected parent individuals.
-        """
-
-        def tournament_select():
-            tournament_size = 3
-            tournament_indices = random.sample(range(len(population)), tournament_size)
-            tournament_fitness = [fitness_scores[i] for i in tournament_indices]
-
-            winner_idx = tournament_indices[
-                tournament_fitness.index(max(tournament_fitness))
-            ]
-            return population[winner_idx]
-
-        parent1 = tournament_select()
-        parent2 = tournament_select()
-        return parent1, parent2
 
     def solve(self) -> Tuple[List[int], float]:
         """
