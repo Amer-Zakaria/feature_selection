@@ -132,8 +132,8 @@ class FeatureSelectionGeneticAlgorithm:
         """
         Performs single-point crossover between two parents to create an offspring.
 
-        The child inherits the first half of its genes from parent1 and the
-        second half from parent2.
+        The child inherits genes from parent1 up to a random crossover point
+        and the remaining genes from parent2.
 
         Args:
             parent1 (List[int]): The first parent individual.
@@ -142,8 +142,8 @@ class FeatureSelectionGeneticAlgorithm:
         Returns:
             List[int]: The offspring individual.
         """
-        half = len(parent1) // 2
-        child = parent1[:half] + parent2[half:]
+        crossover_point = random.randint(1, len(parent1) - 1)
+        child = parent1[:crossover_point] + parent2[crossover_point:]
         return child
 
     def _mutate(self, individual: List[int]) -> List[int]:
