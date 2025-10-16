@@ -9,7 +9,9 @@ from statnew import Pearson, Distance
 from classicalmethods import perform_rfe
 
 
-def run_all_feature_selection(csv_url="data.csv"):
+def run_all_feature_selection(
+    csv_url="data.csv", population_size=10, generations=18, mutation_rate=0.1
+):
     output_messages = []
 
     # Preprocessing
@@ -33,9 +35,9 @@ def run_all_feature_selection(csv_url="data.csv"):
     output_messages.append(f"\n--- Genetic Algorithm Feature Selection ---")
     ga_selection_start_time = datetime.datetime.now()
     ga = FeatureSelectionGeneticAlgorithm(
-        population_size=10,
-        generations=18,
-        mutation_rate=0.1,
+        population_size=population_size,
+        generations=generations,
+        mutation_rate=mutation_rate,
         X_train=data_result.X_train,
         X_test=data_result.X_test,
         y_train=data_result.y_train,
@@ -156,19 +158,47 @@ def run_all_feature_selection(csv_url="data.csv"):
     return "\n".join(output_messages)
 
 
-def process_csv(file="data.csv"):
-    return run_all_feature_selection(file)
+def process_csv(file="data.csv", population_size=10, generations=18, mutation_rate=0.1):
+    return run_all_feature_selection(file, population_size, generations, mutation_rate)
 
 
 # Create Gradio interface
 demo = gr.Interface(
     fn=process_csv,
-    inputs=gr.Text(
-        label="Data (CSV)",
-    ),
+    inputs=[
+        gr.Text(
+            label="Dataset URL (CSV)",
+            placeholder="Keep our dataset URL or replace it with your own",
+            value="https://raw.githubusercontent.com/Amer-Zakaria/600-features-dataset/refs/heads/main/data.csv",
+        ),
+        gr.Slider(
+            minimum=10,
+            maximum=50,
+            value=10,
+            step=1,
+            label="GA Population Size",
+            info="Choose the population size for the Genetic Algorithm (10 is well-tested on our dataset)",
+        ),
+        gr.Slider(
+            minimum=5,
+            maximum=100,
+            value=18,
+            step=1,
+            label="GA Generations",
+            info="Choose the number of generations for the Genetic Algorithm (18 is well-tested on our dataset)",
+        ),
+        gr.Slider(
+            minimum=0.01,
+            maximum=0.5,
+            value=0.1,
+            step=0.01,
+            label="GA Mutation Rate",
+            info="Choose the mutation rate for the Genetic Algorithm (0.1 is a common starting point)",
+        ),
+    ],
     outputs=gr.Textbox(label="Results", lines=30),
     title="Feature Selection Methods Comparison",
-    description="Provide the URL for the CSV file to compare Genetic Algorithm, Statistical (Pearson, Distance), and Classical (RFE) feature selection methods.",
+    description="Provide the URL for the CSV file to compare Genetic Algorithm, Statistical (Pearson, Distance), and Classical (RFE) feature selection methods. THE TARGET COLUMN IS THE FIRST COLUMN OF THE DATASET AFTER THE PREPROCESSING STEP",
     flagging_mode="never",
 )
 
